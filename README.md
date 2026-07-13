@@ -32,18 +32,18 @@ Balancing one pendulum is a textbook exercise. What this project is actually abo
 
 ```
    MATLAB (offline brain + live console)        STM32H745              ODrive S1
-   ┌────────────────────────────┐   UDP   ┌────────────────────────┐   FDCAN
-   │ system-ID   →  fit  → LQR   │  ────►  │  CM4  (FreeRTOS)        │  1 Mbps
-   │ design      →  paste gains  │  ◄────  │  Ethernet · UART · CAN  │  ┌────────┐
-   │ live dashboard + tuning     │         │  supervision only       │  │ motor  │
-   └──────────────┬─────────────┘          ├──── g_shared (4 KB) ────┤  │ + belt │
+   ┌────────────────────────────┐   UDP     ┌─────────────────────-───┐   FDCAN
+   │ system-ID   →  fit  → LQR   │  ────►   │  CM4  (FreeRTOS)        │   1 Mbps
+   │ design      →  paste gains  │  ◄────   │  Ethernet · UART · CAN  │  ┌────────┐
+   │ live dashboard + tuning     │          │  supervision only       │  │ motor  │
+   └──────────────┬─────────────┘           ├──── g_shared (4 KB) ────┤  │ + belt │
                   │                         │  lock-free, D2 SRAM     │  └───▲────┘
-   a human pastes the fitted gains          ├────────────────────────┤      │
+   a human pastes the fitted gains          ├─────-───────────────────┤      │
    into the firmware headers, once  ──────► │  CM7  (bare metal)      │──────┘
                                             │  5 kHz control loop     │  torque or
    ESP32-S3 touch console ── UART ──►       │  estimator · LQR ·      │  velocity
    (public demo + physical fader)           │  swing-up · sys-ID      │  command
-                                            └────────────────────────┘
+                                            └──────-──────────────────┘
 ```
 
 **The M7 owns everything that must not miss a deadline.** A 5 kHz timer interrupt reads the pendulum encoders, estimates the state `[cart position, cart velocity, angle, angular velocity]`, runs the controller, and streams a command to the motor over CAN. That same command stream doubles as the motor's watchdog feed — if the M7 ever stops, the motor stops.
