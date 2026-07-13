@@ -1,0 +1,55 @@
+# ---- Build outputs -------------------------------------------------------
+CM4/Debug/
+CM7/Debug/
+CM4/Release/
+CM7/Release/
+**/build/
+*.o
+*.d
+*.elf
+*.bin
+*.hex
+*.map
+*.list
+
+# ---- Vendored third-party reference demo (Waveshare ESP32 SDK dump) -------
+# ~3300 files of redistributable vendor code — kept locally for bring-up
+# (see ESP32_Display/FIRST_USE.md) but not part of this project's source.
+ESP32_Display/ESP32-S3-Touch-LCD-4.3-Demo/
+ESP32_Display/.pio/
+
+# ---- Copyrighted vendor document -----------------------------------------
+ESP32_Display/ESP32-S3-Touch-LCD-4.3 - Waveshare Wiki.pdf
+
+# ---- CubeMX / IDE scratch & local state ----------------------------------
+mx.scratch/
+.mxproject
+*.launch
+
+# ---- Internal tooling output (regenerated locally) -----------------------
+graphify-out/
+
+# ---- Agent memory / private notes (never publish) ------------------------
+.claude/
+# Personal Claude Code workflow config (not project source). Remove this line
+# if you want it published with the repo.
+CLAUDE.md
+
+# ---- Internal engineering notes (kept local; not for the public repo) -----
+# Candid status reports, handoffs, and planning docs. Remove entries here to
+# publish them (best paired with a private repo).
+AGENT_HANDOFF.md
+docs/HANDOFF.md
+docs/STATUS_2026-07-04.md
+docs/STATUS_REPORT_2026-07-06.md
+docs/STATUS_11_07.md
+docs/STAGE1_REPORT_2026-07-04.md
+docs/C_CPP_GUIDE.md
+stm32h755_project_checklist_v4.md
+stm32h755_todo.md
+
+# ---- OS / editor cruft ---------------------------------------------------
+.DS_Store
+Thumbs.db
+*.swp
+*~

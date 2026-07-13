@@ -1,0 +1,38 @@
+# Build artifacts (adjust if your build output folders are named differently)
+CM4/Debug/
+CM4/Release/
+CM7/Debug/
+CM7/Release/
+*.elf
+*.bin
+*.hex
+*.map
+*.o
+*.d
+*.lst
+
+# External context and non-firmware folders
+docs/
+ESP32_Display/
+
+# IDE and CubeMX generation files
+.settings/
+.mxproject
+.project
+mx.scratch
+
+# Ignore ST's bundled documentation and images
+*.html
+*.pdf
+*.chm
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.txt
+
+# Block remaining text and data formats
+*.md
+*.json
+*.xml
+*.csv
