@@ -84,6 +84,28 @@ Gains are **pasted by a human, not streamed**: the running machine has no depend
 
 ---
 
+## Pin map
+
+STM32H745 on the NUCLEO-H745ZI-Q. The Cortex-M7 owns the real-time I/O (encoders, motor CAN, rail, operator input); the Cortex-M4 owns the comms links (Ethernet, ESP32 UART).
+
+| Function | Peripheral | Pin(s) | Core |
+|---|---|---|---|
+| Pendulum encoders | SPI1 | SCK `PA5`, MISO `PA6`, MOSI `PD7`, CS0 `PD14` | M7 |
+| ODrive motor link | FDCAN1 @ 1 Mbps | RX `PD0`, TX `PD1` | M7 |
+| Rail home-end limit | EXTI (rising) | `PD15` | M7 |
+| Rail far-end limit | EXTI (rising) | `PE11` | M7 |
+| Rail homing switch | GPIO input (polled) | `PE13` | M7 |
+| Operator fader / pot | ADC1 | `PA3` | M7 |
+| User button | GPIO | `PC13` | M7 |
+| Status LEDs | GPIO | green `PB0`, yellow `PE1`, red `PB14` | M7 |
+| Control-loop scope | GPIO | `PE2` (toggles at 5 kHz) | M7 |
+| ESP32 console | USART2 | TX `PD5`, RX `PD6` | M4 |
+| Host dashboard | Ethernet (RMII, LAN8742) | static `192.168.1.10` | M4 |
+
+The three rail switches are wired NC-to-GND with internal pull-ups, so an open contact or a broken wire reads high and is fail-safe. The two **end** switches cut power and latch on contact; the inboard **homing** switch (polled during homing) sets the rail zero. Encoder CS1/CS2 alias CS0 (`PD14`) until links 2 and 3 are wired. Full detail in `docs/STM32_pinout.pdf`.
+
+---
+
 ## Repository layout
 
 ```

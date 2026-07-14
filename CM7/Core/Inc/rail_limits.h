@@ -62,12 +62,14 @@ extern "C" {
 /* ---- Build-time configuration ------------------------------------------ */
 
 /* 0 = switches not wired: Home zeroes at the current cart position and the
- * EXTI/creep machinery is compiled out. 1 = switches wired on the pins
- * below: Home creeps onto the home switch; both switches trip via EXTI. */
+ * EXTI/creep machinery is compiled out. 1 = switches wired on the pins below:
+ * homing creeps onto the inboard RAIL_SW_HOME_REF switch (polled); the two end
+ * switches (RAIL_SW_HOME / RAIL_SW_FAR) cut power via EXTI. */
 #define RAIL_HOME_SWITCH_WIRED   1
 
-/* Rail geometry (revolutions, rail frame: 0 = home switch trigger point). */
-#define RAIL_TRAVEL_REV          12.0f   /* home -> far end; MEASURE ON BENCH */
+/* Rail geometry (revolutions, rail frame: 0 = homing-switch (RAIL_SW_HOME_REF)
+ * trigger point, which sits inboard of the home-end wall). */
+#define RAIL_TRAVEL_REV          12.0f   /* homing switch -> far end; MEASURE ON BENCH */
 #define RAIL_SOFT_MARGIN_REV     0.5f    /* soft limit inset from each end */
 #define RAIL_HARD_MARGIN_REV     0.15f   /* sw hard limit inset from each end */
 #define RAIL_BACKOFF_REV         0.30f   /* re-arm hold point inside a hard limit */
@@ -88,14 +90,22 @@ extern "C" {
 #define RAIL_HOME_CREEP_REV_S    (-0.5f)
 #define RAIL_HOME_TIMEOUT_MS     30000u
 
-/* End-switch pins (set as pull-up inputs in the .ioc; RailLimits_Init re-inits
- * them as EXTI). Home = PF14 (EXTI14), Far = PE11 (EXTI11) — both lines fall in
- * the 10..15 group, so they share the single EXTI15_10_IRQn vector/handler.
- * (Home was PE9/EXTI9_5; moved to PF14 after PE9 wouldn't read on the bench.) */
-#define RAIL_SW_HOME_PORT        GPIOF
-#define RAIL_SW_HOME_PIN         GPIO_PIN_14
-#define RAIL_SW_FAR_PORT         GPIOE
+/* Switch set — three switches, two roles:
+ *  - HARD-LIMIT end switches (cut power + latch), EXTI, ALWAYS armed:
+ *      RAIL_SW_HOME = home end (PD15, EXTI15), RAIL_SW_FAR = far end (PE11,
+ *      EXTI11). Both lines are in the 10..15 group -> shared EXTI15_10 vector.
+ *  - HOMING reference (RAIL_SW_HOME_REF), inboard on the home side (PE13):
+ *      a plain POLLED input, read only during the homing creep. It defines
+ *      rail zero and never cuts power — NOT a hard limit, no EXTI.
+ * All three: NC to GND, internal pull-up, actuated / broken wire = HIGH.
+ * (Home-end went PG2 -> PE9 -> PF14 -> PD15; the earlier pins wouldn't pull
+ * low on the bench. PD15 verified by live SWD read of GPIOD IDR.) */
+#define RAIL_SW_HOME_PORT        GPIOD        /* home-end hard limit       */
+#define RAIL_SW_HOME_PIN         GPIO_PIN_15
+#define RAIL_SW_FAR_PORT         GPIOE        /* far-end hard limit        */
 #define RAIL_SW_FAR_PIN          GPIO_PIN_11
+#define RAIL_SW_HOME_REF_PORT    GPIOE        /* homing reference (polled) */
+#define RAIL_SW_HOME_REF_PIN     GPIO_PIN_13
 
 /* ---- Rail state (mirrored into g_shared.rail_state for telemetry) ------ */
 #define RAIL_STATE_UNHOMED       0u

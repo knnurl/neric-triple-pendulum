@@ -57,12 +57,12 @@ void Error_Handler(void);
 /* USER CODE END EFP */
 
 /* Private defines -----------------------------------------------------------*/
-#define RAIL_HOME_SW_Pin GPIO_PIN_14
-#define RAIL_HOME_SW_GPIO_Port GPIOF
 #define RAIL_END_SW_Pin GPIO_PIN_11
 #define RAIL_END_SW_GPIO_Port GPIOE
 #define ENC_CS0_Pin GPIO_PIN_14
 #define ENC_CS0_GPIO_Port GPIOD
+#define RAIL_HOME_SW_Pin GPIO_PIN_15
+#define RAIL_HOME_SW_GPIO_Port GPIOD
 
 /* USER CODE BEGIN Private defines */
 

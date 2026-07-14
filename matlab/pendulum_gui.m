@@ -75,6 +75,7 @@ s.enc_err_prev = [0 0 0];   % per-encoder reject totals, for delta detection
 s.fault_tt_m7  = uint32(2^32-1);   % last tooltip fault words (force first build)
 s.fault_tt_m4  = uint32(2^32-1);
 s.fault_prev   = false;            % edge-detect faults to reset the vel slider
+s.pos_follow_hold = 0;             % frames to suppress pos-slider auto-follow after a drag
 s.t_start  = tic;
 s.p        = make_empty_packet();
 % Plot ring buffers (degrees)
@@ -269,6 +270,13 @@ for i = 1:6
 end
 mode_btns(4).BackgroundColor = [0.55 0.12 0.12];   % E-STOP always red
 
+% Swap the E-STOP and SWING-UP cells: E-STOP to the upper-right (btn 4),
+% SWING-UP below it (btn 2). Only the row changes (both stay column 2).
+% Button identity / mode / highlight are all by index, so this is purely a
+% layout move — nothing else needs to change.
+mode_btns(2).Layout.Row = 2;   % SWING-UP -> lower-right
+mode_btns(4).Layout.Row = 1;   % E-STOP  -> upper-right
+
 % -- Position setpoint --
 pos_hdr = uigridlayout(ctrl, [1 2], 'RowHeight', {'1x'}, ...
     'ColumnWidth', {'1x', 90}, 'Padding', [0 0 0 0], 'BackgroundColor', C.card);
@@ -418,6 +426,20 @@ fig.CloseRequestFcn = @on_close;
         tl_L2.Text    = sprintf('%+.1f°', rad2deg(p.angle(2)));
         tl_L3.Text    = sprintf('%+.1f°', rad2deg(p.angle(3)));
         tl_cartp.Text = sprintf('%+.3f', p.cart_pos);
+
+        % ---- Position slider tracks the live cart position --------------
+        % Shows where the cart actually is (rev, rail frame) on the slider in
+        % every mode, incl. velocity mode. Setting .Value programmatically does
+        % NOT fire on_pos_slide, so no spurious setpoint is sent. Suppressed for
+        % a short window after the operator drags the slider or hits a quick-set
+        % button (pos_follow_hold), so their input isn't stomped mid-gesture.
+        if s.pos_follow_hold > 0
+            s.pos_follow_hold = s.pos_follow_hold - 1;
+        else
+            cp = min(RAIL_TRAVEL, max(0, p.cart_pos));   % clamp into slider limits
+            pos_slider.Value = cp;
+            lbl_pos_val.Text = sprintf('%+.3f', cp);
+        end
         tl_cartv.Text = sprintf('%+.3f', p.cart_vel);
         tl_motor.Text = sprintf('%+.4f', p.motor_cmd);
         tl_odrv.Text  = sprintf('%+.3f', p.odrv_pos);
@@ -559,6 +581,7 @@ fig.CloseRequestFcn = @on_close;
     % underlying property only updates on release, event.Value is live.
     function on_pos_slide(~, event)
         v = event.Value;
+        s.pos_follow_hold = ceil(600/POLL_MS);   % ~0.6 s: don't auto-follow while dragging
         lbl_pos_val.Text = sprintf('%+.3f', v);
         send_mode(4);       % CTRL_MODE_POT_POSITION
         send_setpoint(v);
@@ -572,6 +595,7 @@ fig.CloseRequestFcn = @on_close;
     end
 
     function set_pos_value(v)
+        s.pos_follow_hold = ceil(600/POLL_MS);   % hold the target briefly before follow resumes
         pos_slider.Value = v;
         lbl_pos_val.Text = sprintf('%+.3f', v);
         send_mode(4);

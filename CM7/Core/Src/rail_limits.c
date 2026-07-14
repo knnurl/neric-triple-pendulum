@@ -130,11 +130,11 @@ static void set_cmd(uint8_t mode, float cmd)
 void RailLimits_Init(void)
 {
 #if RAIL_HOME_SWITCH_WIRED
-    __HAL_RCC_GPIOF_CLK_ENABLE();   /* PF14 home */
-    __HAL_RCC_GPIOE_CLK_ENABLE();   /* PE11 far  */
+    __HAL_RCC_GPIOD_CLK_ENABLE();   /* PD15 home */
+    __HAL_RCC_GPIOE_CLK_ENABLE();   /* PE11 far, PE13 homing ref */
 
-    /* Home (PF14) and far (PE11) are on different ports, so init each
-     * separately. Both EXTI lines (14 and 11) fall in the 10..15 group and
+    /* Home (PD15) and far (PE11) are on different ports, so init each
+     * separately. Both EXTI lines (15 and 11) fall in the 10..15 group and
      * share the single EXTI15_10 vector. */
     GPIO_InitTypeDef g = {0};
     g.Mode  = GPIO_MODE_IT_RISING;   /* pressed/broken -> HIGH -> trip */
@@ -144,6 +144,13 @@ void RailLimits_Init(void)
     HAL_GPIO_Init(RAIL_SW_HOME_PORT, &g);
     g.Pin   = RAIL_SW_FAR_PIN;
     HAL_GPIO_Init(RAIL_SW_FAR_PORT, &g);
+
+    /* Homing reference (PE13): plain polled input with pull-up, NOT an EXTI —
+     * it is only read during the homing creep and never cuts power. (Its port,
+     * GPIOE, is already clocked above for the far switch.) */
+    g.Mode  = GPIO_MODE_INPUT;
+    g.Pin   = RAIL_SW_HOME_REF_PIN;
+    HAL_GPIO_Init(RAIL_SW_HOME_REF_PORT, &g);
 
     /* Configuring the pins as EXTI latches a spurious pending bit from the
      * config transition (and the pull-up settling). Clear the EXTI line
@@ -156,7 +163,7 @@ void RailLimits_Init(void)
 
     /* Same preempt priority as TIM7 (0): can't preempt an in-flight tick,
      * runs immediately after — <=200 us latency, backed by the sw limit.
-     * PF14 (line 14) and PE11 (line 11) both live on the EXTI15_10 vector. */
+     * PD15 (line 15) and PE11 (line 11) both live on the EXTI15_10 vector. */
     HAL_NVIC_SetPriority(EXTI15_10_IRQn, 0, 0);
     HAL_NVIC_EnableIRQ(EXTI15_10_IRQn);
 
@@ -184,10 +191,11 @@ bool RailLimits_StartHoming(uint32_t timeout_ms)
 
 #if RAIL_HOME_SWITCH_WIRED
     uint32_t seq0 = g_shared.command_seq;
-    s_homing = true;    /* supervisor off; home-switch trip ignored */
+    s_homing = true;    /* gate the SOFTWARE travel-limit supervisor off during
+                         * the creep; the physical end switches stay armed. */
 
-    /* Creep toward the home switch, streamed via the control loop (see
-     * set_cmd — keeps the ODrive watchdog fed). */
+    /* Creep toward the inboard homing switch, streamed via the control loop
+     * (see set_cmd — keeps the ODrive watchdog fed). */
     Odrive_SetControllerMode(ODRIVE_CTRL_MODE_VELOCITY, ODRIVE_INPUT_MODE_PASSTHROUGH);
     Odrive_SetAxisState(ODRIVE_AXIS_STATE_CLOSED_LOOP_CONTROL);
     set_cmd(CTRL_MODE_POT_VELOCITY, RAIL_HOME_CREEP_REV_S);
@@ -196,8 +204,10 @@ bool RailLimits_StartHoming(uint32_t timeout_ms)
     uint32_t t0 = HAL_GetTick();
     while ((HAL_GetTick() - t0) < timeout_ms) {
         if (remote_stop_requested(seq0)) break;
-        if (sw_pressed(RAIL_SW_HOME_PORT, RAIL_SW_HOME_PIN)) { hit = true; break; }
-        /* far switch still trips via EXTI (wrong creep direction) -> RL_DWELL */
+        if (sw_pressed(RAIL_SW_HOME_REF_PORT, RAIL_SW_HOME_REF_PIN)) { hit = true; break; }
+        /* An end switch tripping (home-end overshoot, or far-end from a wrong
+         * creep direction) cuts power via EXTI -> RL_DWELL; s_state leaves
+         * RL_NORMAL and the creep aborts here. */
         if (s_state != RL_NORMAL) break;
     }
 
@@ -311,7 +321,11 @@ static void hard_trip(bool phys, bool at_max)
         }
         return;
     }
-    if (s_homing && phys && !at_max) return; /* homing drives into the HOME switch only */
+    /* Both end switches stay armed even during homing: the creep now targets
+     * the separate inboard homing switch (RAIL_SW_HOME_REF), so a home-end
+     * trip here means the creep overshot — a real emergency to cut. (This is
+     * the old s_homing home-suppression, deliberately removed with the
+     * dedicated homing switch.) */
     if (!phys && !s_homed)          return;  /* rail frame meaningless unhomed */
     if (!mode_is_active())          return;  /* unpowered; nothing to cut */
 
@@ -437,7 +451,7 @@ void RailLimits_Tick(float motor_pos, uint32_t now_ms)
  * ===================================================================== */
 
 #if RAIL_HOME_SWITCH_WIRED
-/* Both end switches share the EXTI15_10 vector now: home = PF14 (line 14),
+/* Both end switches share the EXTI15_10 vector now: home = PD15 (line 15),
  * far = PE11 (line 11). One handler services both, checking each pin's flag.
  *
  * Level-confirm before tripping: clear the flag, then only hard_trip if the
@@ -449,7 +463,7 @@ void RailLimits_Tick(float motor_pos, uint32_t now_ms)
  * register. */
 void EXTI15_10_IRQHandler(void)
 {
-    if (__HAL_GPIO_EXTI_GET_IT(RAIL_SW_HOME_PIN) != 0u) {   /* PF14 = home */
+    if (__HAL_GPIO_EXTI_GET_IT(RAIL_SW_HOME_PIN) != 0u) {   /* PD15 = home */
         __HAL_GPIO_EXTI_CLEAR_IT(RAIL_SW_HOME_PIN);
         if (sw_pressed(RAIL_SW_HOME_PORT, RAIL_SW_HOME_PIN)) {
             hard_trip(true, false);
